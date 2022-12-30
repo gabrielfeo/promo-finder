@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+
+import feedparser
+import requests
+from bs4 import BeautifulSoup
+import re
+import pandas
+from pandas import DataFrame
+import sys
+import time
+
+FEED_URL = 'https://pontospravoar.com/feed'
+USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
+
+
+def find_articles(title_pattern, document_pattern, until_page):
+    page = 1
+    while page <= until_page:
+        feed = feedparser.parse(f"{FEED_URL}?paged={page}")
+        for rss_entry in feed.entries:
+            if re.match(title_pattern, rss_entry.title):
+                doc = requests.get(rss_entry.link, headers={'User-Agent': USER_AGENT}).text
+                if not document_pattern or re.match(document_pattern, doc):
+                    yield rss_entry, doc
+        page += 1
+
+
+def find_transfer_promos_table(document: str) -> DataFrame:
+    soup = BeautifulSoup(document, features='html.parser')
+    transfers_section = soup.find('h3', string='Promoções de Transferência de Pontos')
+    next_table_element = transfers_section.findNext('table')
+    table = pandas.read_html(str(next_table_element))[0]
+    if "Parceiro" in table:
+        return table
+    else:
+        # Not a transfer promos table
+        return DataFrame()
+
+
+def print_promos_tables_matching(articles, promo_pattern, max_articles):
+    parsed_articles = 0
+    for rss_entry, html in articles:
+        print(f"Processing '{rss_entry.title}'", file=sys.stderr)
+        promos = find_transfer_promos_table(html)
+        if not promos.empty:
+            partners = promos['Parceiro']
+            programs = promos['Programa']
+            matching_promos = promos[partners.str.match(promo_pattern) | programs.str.match(promo_pattern)]
+            if not matching_promos.empty:
+                print(matching_promos)
+        parsed_articles += 1
+        if parsed_articles >= max_articles:
+            break
+
+
+def search_matching_promos(args):
+    articles = find_articles(
+        title_pattern=args.title,
+        document_pattern=None,
+        until_page=args.until_page,
+    )
+    print_promos_tables_matching(
+        articles=articles,
+        promo_pattern=args.promo,
+        max_articles=args.max_articles,
+    )
+
+
+def await_matching_promo(args):
+    last_match_title = ""
+    while True:
+        articles = find_articles(
+            title_pattern=args.title,
+            document_pattern=None,
+            until_page=1,
+        )
+        rss, html = next(articles)
+        if rss.title == last_match_title:
+            time.sleep(args.delay)
+            continue
+        else:
+            last_match_title = rss.title
+        print_promos_tables_matching(
+            articles=[(rss, html)],
+            promo_pattern=args.promo,
+            max_articles=1,
+        )
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--title', default='Radar PPV')
+    parser.add_argument('--promo', default='.*Azul')
+    subparsers = parser.add_subparsers(help='commands', dest='command')
+    await_parser = subparsers.add_parser('await-promo')
+    await_parser.add_argument('--delay', default=600, type=int, help='delay between requests in seconds')
+    search_parser = subparsers.add_parser('search-promos')
+    search_parser.add_argument('--until-page', default=10, type=int)
+    search_parser.add_argument('--max-articles', default=10, type=int)
+    args = parser.parse_args()
+    try:
+        if args.command == 'search-promos':
+            search_matching_promos(args)
+        elif args.command == 'await-promo':
+            await_matching_promo(args)
+    except KeyboardInterrupt:
+        exit(0)
