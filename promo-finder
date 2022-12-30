@@ -90,14 +90,14 @@ def await_matching_promo(args):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--title', default='Radar PPV')
-    parser.add_argument('--promo', default='.*Azul')
-    subparsers = parser.add_subparsers(help='commands', dest='command')
-    await_parser = subparsers.add_parser('await-promo')
+    parser.add_argument('--title', default='Radar PPV', help='title pattern to be matched')
+    parser.add_argument('--promo', help='promotion pattern to be matched')
+    subparsers = parser.add_subparsers(title='Commands', dest='command')
+    await_parser = subparsers.add_parser('await-promo', help='Await a matching promo to show up')
     await_parser.add_argument('--delay', default=600, type=int, help='delay between requests in seconds')
-    search_parser = subparsers.add_parser('search-promos')
-    search_parser.add_argument('--until-page', default=10, type=int)
-    search_parser.add_argument('--max-articles', default=10, type=int)
+    search_parser = subparsers.add_parser('search-promos', help='Search for past promos')
+    search_parser.add_argument('--until-page', default=10, type=int, help='last RSS page allowed to search')
+    search_parser.add_argument('--max-articles', default=10, type=int, help='max articles to process (after title match)')
     args = parser.parse_args()
     try:
         if args.command == 'search-promos':
