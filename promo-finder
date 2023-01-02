@@ -72,9 +72,13 @@ def await_matching_promo(args):
         articles = find_articles(
             title_pattern=args.title,
             document_pattern=None,
-            until_page=1,
+            until_page=args.until_page,
         )
-        rss, html = next(articles)
+        article = next(articles, None)
+        if not article:
+            sys.exit(('No matching articles. If there should be matches for '
+                   'given filter, try increasing --until-page.'))
+        rss, html = article
         if rss.title == last_match_title:
             time.sleep(args.delay)
             continue
@@ -92,11 +96,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--title', default='Radar PPV', help='title pattern to be matched')
     parser.add_argument('--promo', help='promotion pattern to be matched')
+    parser.add_argument('--until-page', default=10, type=int, help='last RSS page allowed to search')
     subparsers = parser.add_subparsers(title='Commands', dest='command')
     await_parser = subparsers.add_parser('await-promo', help='Await a matching promo to show up')
     await_parser.add_argument('--delay', default=600, type=int, help='delay between requests in seconds')
     search_parser = subparsers.add_parser('search-promos', help='Search for past promos')
-    search_parser.add_argument('--until-page', default=10, type=int, help='last RSS page allowed to search')
     search_parser.add_argument('--max-articles', default=10, type=int, help='max articles to process (after title match)')
     args = parser.parse_args()
     try:
