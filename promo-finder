@@ -28,13 +28,12 @@ def find_articles(title_pattern, document_pattern, until_page):
 def find_transfer_promos_table(document: str) -> DataFrame:
     soup = BeautifulSoup(document, features='html.parser')
     transfers_section = soup.find('h3', string='Promoções de Transferência de Pontos')
-    next_table_element = transfers_section.findNext('table')
-    table = pandas.read_html(str(next_table_element))[0]
-    if "Parceiro" in table:
-        return table
-    else:
-        # Not a transfer promos table
+    table_element = transfers_section and transfers_section.findNext('table')
+    table = table_element and pandas.read_html(str(table_element))[0]
+    if table is None or table.empty or "Parceiro" not in table:
         return DataFrame()
+    else:
+        return table
 
 
 def print_promos_tables_matching(articles, promo_pattern, max_articles):
@@ -48,6 +47,8 @@ def print_promos_tables_matching(articles, promo_pattern, max_articles):
             matching_promos = promos[partners.str.match(promo_pattern) | programs.str.match(promo_pattern)]
             if not matching_promos.empty:
                 print(matching_promos)
+        else:
+            print(f"No promos found in '{rss_entry.title}'", file=sys.stderr)
         parsed_articles += 1
         if parsed_articles >= max_articles:
             break
