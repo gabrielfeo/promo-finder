@@ -27,7 +27,7 @@ def find_articles(title_pattern, document_pattern, until_page):
 
 def find_transfer_promos_table(document: str) -> DataFrame:
     soup = BeautifulSoup(document, features='html.parser')
-    transfers_section = soup.find('h3', string='Promoções de Transferência de Pontos')
+    transfers_section = soup.find(string='Promoções de Transferência de Pontos')
     table_element = transfers_section and transfers_section.findNext('table')
     table = table_element and pandas.read_html(str(table_element))[0]
     if table is None or table.empty or "Parceiro" not in table:
